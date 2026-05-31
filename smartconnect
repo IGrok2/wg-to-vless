@@ -2,7 +2,7 @@
 # ╔══════════════════════════════════════════════════════════╗
 # ║              SmartConnect v1.0.0                         ║
 # ║     WireGuard → VLESS Tunnel Manager                     ║
-# ║     https://github.com/your-username/smartconnect        ║
+# ║     https://github.com/IGrok2/smartconnect        ║
 # ╚══════════════════════════════════════════════════════════╝
 set -euo pipefail
 
