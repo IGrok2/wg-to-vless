@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+# ╔══════════════════════════════════════════════════════════╗
+# ║              SmartConnect v1.0.0                         ║
+# ║     WireGuard → VLESS Tunnel Manager                     ║
+# ║     https://github.com/your-username/smartconnect        ║
+# ╚══════════════════════════════════════════════════════════╝
+set -euo pipefail
+
+# ─── Resolve real script directory ──────────────────────────────────────────
+SC_SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+
+# ─── Bootstrap ───────────────────────────────────────────────────────────────
+source "${SC_SCRIPT_DIR}/lib/core.sh"
+
+init_dirs
+setup_colors
+load_config
+load_locale
+
+source "${SC_SCRIPT_DIR}/lib/installer.sh"
+source "${SC_SCRIPT_DIR}/lib/subscriptions.sh"
+source "${SC_SCRIPT_DIR}/lib/configs.sh"
+source "${SC_SCRIPT_DIR}/lib/tunnel.sh"
+source "${SC_SCRIPT_DIR}/lib/settings.sh"
+
+# ─── First-run: check deps ───────────────────────────────────────────────────
+missing=($(check_deps))
+if [[ ${#missing[@]} -gt 0 ]]; then
+    setup_colors
+    printf "\n${C_BYELLOW}[!]${C_RESET} Missing dependencies: ${missing[*]}\n"
+    printf "${C_BCYAN}[→]${C_RESET} Attempting automatic install...\n\n"
+    install_deps "${missing[@]}" || {
+        printf "${C_BRED}[✗]${C_RESET} Could not install dependencies. Please install manually:\n"
+        printf "     %s\n" "${missing[*]}"
+        exit 1
+    }
+fi
+
+# ─── Handle CLI arguments ─────────────────────────────────────────────────────
+if [[ $# -gt 0 ]]; then
+    case "$1" in
+        connect)    do_connect; exit ;;
+        disconnect) do_disconnect; exit ;;
+        status)     show_status; exit ;;
+        update)     update_all_subscriptions; exit ;;
+        install)    menu_install_core; exit ;;
+        --version|-v)
+            printf "SmartConnect %s\n" "$SC_VERSION"
+            exit 0
+            ;;
+        --help|-h)
+            cat <<HELP
+SmartConnect ${SC_VERSION} — WireGuard → VLESS Tunnel Manager
+
+Usage: smartconnect [COMMAND]
+
+Commands:
+  connect        Connect tunnel
+  disconnect     Disconnect tunnel
+  status         Show current status
+  update         Update all subscriptions
+  install        Install / update VPN core
+
+  (no args)      Open interactive TUI menu
+
+HELP
+            exit 0
+            ;;
+        *)
+            printf "${C_BRED}Unknown command:${C_RESET} %s\n" "$1"
+            printf "Run 'smartconnect --help' for usage.\n"
+            exit 1
+            ;;
+    esac
+fi
+
+# ─── Main TUI loop ────────────────────────────────────────────────────────────
+main_menu() {
+    while true; do
+        draw_header
+        draw_status_bar
+
+        printf "\n"
+        printf "  ${C_BYELLOW}1${C_RESET}  %s\n" "$L_MENU_STATUS"
+
+        # Connect / Disconnect depending on state
+        if is_connected 2>/dev/null; then
+            printf "  ${C_BYELLOW}2${C_RESET}  ${C_RED}%s${C_RESET}\n" "$L_MENU_DISCONNECT"
+        else
+            printf "  ${C_BYELLOW}2${C_RESET}  ${C_BGREEN}%s${C_RESET}\n" "$L_MENU_CONNECT"
+        fi
+
+        printf "  ${C_BYELLOW}3${C_RESET}  %s\n" "$L_MENU_SUBS"
+        printf "  ${C_BYELLOW}4${C_RESET}  %s\n" "$L_MENU_NODES"
+        printf "  ${C_BYELLOW}5${C_RESET}  %s\n" "$L_MENU_WG"
+        printf "  ${C_BYELLOW}6${C_RESET}  %s\n" "$L_MENU_SETTINGS"
+        printf "  ${C_BYELLOW}7${C_RESET}  %s\n" "$L_MENU_LOGS"
+        printf "  ${C_BYELLOW}8${C_RESET}  %s\n" "$L_MENU_INSTALL"
+        printf "\n"
+        printf "  ${C_BYELLOW}0${C_RESET}  ${C_DIM}%s${C_RESET}\n" "$L_MENU_EXIT"
+        printf "\n"
+
+        menu_prompt "$L_MENU_CHOOSE"
+        read -r choice
+
+        case "$choice" in
+            1) show_status ;;
+            2)
+                if is_connected 2>/dev/null; then
+                    do_disconnect
+                else
+                    do_connect
+                fi
+                ;;
+            3) menu_subscriptions ;;
+            4) menu_select_node ;;
+            5) menu_wireguard ;;
+            6) menu_settings ;;
+            7) menu_logs ;;
+            8) menu_install_core ;;
+            0|q|Q|exit|quit)
+                printf "\n${C_DIM}Goodbye.${C_RESET}\n\n"
+                exit 0
+                ;;
+            *)
+                msg_warn "$L_INVALID"
+                sleep 0.5
+                ;;
+        esac
+    done
+}
+
+main_menu
