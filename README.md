@@ -4,8 +4,7 @@
 
 **Installer**
 ```bash
-# curl -fsSL https://raw.githubusercontent.com/IGrok2/wg-to-vless/main/install.sh | bash:
-
+curl -fsSL https://raw.githubusercontent.com/IGrok2/wg-to-vless/main/install.sh | bash
 ```
 
 Управляет цепочкой: **WireGuard клиент → VLESS прокси → интернет**
